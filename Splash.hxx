@@ -30,7 +30,8 @@ struct LibSplash {
   std::string redux_st,
               elemental_st,
               mvmul_st,
-              mxops_st;
+              mxops_st,
+              vecops_st;
 
   LibSplash(std::string splashdir);
 
@@ -57,6 +58,15 @@ class ocl {
     cl::Program libsplash;
 
     size_t ipt{64};
+    static size_t gsize(size_t N) {
+
+      size_t gsz = static_cast<size_t>(ceil(N/ocl::get().ipt));
+      gsz += 256 - (gsz % 256);
+      return gsz;
+
+    }
+
+    static size_t lsize() { return 256; }
 
 
   private:
@@ -79,15 +89,21 @@ class ocl {
     void operator=(const ocl &) = delete;
 };
 
-struct dvec
-{
+struct dvec {
+
   size_t N;
   cl::Buffer v;
+  _cl_buffer_region *br{nullptr};
+
+  dvec & operator = (const dvec &);
+
   double* readback();
+
 };
 
 std::string show_vec(double *v, size_t N);
 std::string show_matrix(double *A, size_t N, size_t M);
+std::string show_subspace(double *A, size_t N, size_t M);
 
 
 struct dsmatrix {
@@ -113,6 +129,18 @@ struct dmatrix {
   double *readback();
   dcol C(size_t idx);
   void zero();
+};
+
+struct dsubspace {
+
+  size_t N, M;
+  cl::Buffer v;
+
+  dsubspace(size_t N, size_t M);
+  dvec operator () (size_t idx);
+  void zero();
+  double* readback();
+
 };
 
 struct dscalar {

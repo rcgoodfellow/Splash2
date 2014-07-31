@@ -24,6 +24,29 @@ splash::new_dvec(std::vector<double> values)
   return v;
 }
 
+dvec &
+dvec::operator = (const dvec &a) {
+
+  if(a.N != N) {
+    throw runtime_error("assignment of incompatible dvecs");
+  }
+
+  cl::Kernel kvx_set{ocl::get().libsplash, "vx_set"};
+
+  kvx_set.setArg(0, v);
+  kvx_set.setArg(1, a.v);
+  kvx_set.setArg(2, N);
+  kvx_set.setArg(3, ocl::get().ipt);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kvx_set,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(N)},
+      cl::NDRange{ocl::lsize()});
+
+  return *this;
+}
+
 double*
 dvec::readback() {
   
@@ -57,6 +80,21 @@ string splash::show_matrix(double *A, size_t N, size_t M) {
   for(size_t i=0; i<N; ++i) { 
     for(size_t j=0; j<M; ++j) {
       ss << A[M*i+j] << "\t";
+    }
+    ss << std::endl;
+  }
+
+  return ss.str();
+
+}
+
+string splash::show_subspace(double *S, size_t N, size_t M) {
+
+  stringstream ss;
+  ss << std::setprecision(3) << std::fixed;
+  for(size_t i=0; i<N; ++i) {
+    for(size_t j=0; j<M; ++j) {
+      ss << S[M*j+i] << "\t";
     }
     ss << std::endl;
   }
@@ -193,6 +231,57 @@ dmatrix::zero() {
 
 }
 
+void
+dsubspace::zero() {
+  
+  cl::Kernel kmx_zero = cl::Kernel(ocl::get().libsplash, "mx_zero");
+
+  kmx_zero.setArg(0, v);
+  kmx_zero.setArg(1, N);
+  kmx_zero.setArg(2, M);
+  kmx_zero.setArg(3, ocl::get().ipt);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kmx_zero,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(N*M)},
+      cl::NDRange{ocl::lsize()});
+
+}
+
+dsubspace::dsubspace(size_t N, size_t M) 
+  : N{N}, M{M}, v{ocl::get().ctx, CL_MEM_READ_WRITE, sizeof(double)*N*M} { }
+
+dvec dsubspace::operator () (size_t idx) {
+
+  dvec x;
+  x.N = N;
+  x.br = (_cl_buffer_region*)malloc(sizeof(_cl_buffer_region));
+  x.br->origin = N*idx;
+  x.br->size = N;
+
+  x.v = v.createSubBuffer(CL_MEM_READ_WRITE,
+      CL_BUFFER_CREATE_TYPE_REGION,
+      x.br);
+  
+  return x;
+
+}
+
+double* dsubspace::readback() {
+
+  double *d = (double*)malloc(sizeof(double)*N*M);
+  ocl::get().q.enqueueReadBuffer(
+      v,
+      CL_TRUE,
+      0,
+      sizeof(double)*N*M,
+      d);
+
+  return d;
+
+}
+
 //LibSplash ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 LibSplash::LibSplash(string splashdir)
@@ -209,12 +298,14 @@ LibSplash::readSource() {
   elemental_st = read_file(splashdir + "/kernels/Elementals.cl");
   mvmul_st = read_file(splashdir + "/kernels/MatrixVectorMul.cl");
   mxops_st = read_file(splashdir + "/kernels/MatrixOps.cl");
+  vecops_st = read_file(splashdir + "/kernels/VectorOps.cl");
 
   src = {
     make_pair(redux_st.c_str(), redux_st.length()),
     make_pair(elemental_st.c_str(), elemental_st.length()),
     make_pair(mvmul_st.c_str(), mvmul_st.length()),
-    make_pair(mxops_st.c_str(), mxops_st.length())
+    make_pair(mxops_st.c_str(), mxops_st.length()),
+    make_pair(vecops_st.c_str(), vecops_st.length())
   };
 
 }

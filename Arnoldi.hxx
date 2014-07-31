@@ -8,10 +8,11 @@ namespace splash {
 struct Arnoldi {
 
   dsmatrix A; 
-  dmatrix Q, H;
-  dvec q0;
+  dsubspace Q, H;
+  dvec xi;
+  size_t m{10};
 
-  Arnoldi(dsmatrix A, dvec q0);
+  Arnoldi(dsmatrix A, dvec xi);
 
   Arnoldi & operator()();
 
