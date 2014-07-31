@@ -60,7 +60,7 @@ class ocl {
     size_t ipt{64};
     static size_t gsize(size_t N) {
 
-      size_t gsz = static_cast<size_t>(ceil(N/ocl::get().ipt));
+      size_t gsz = static_cast<size_t>(ceil(N/64.0));
       gsz += 256 - (gsz % 256);
       return gsz;
 
@@ -91,7 +91,7 @@ class ocl {
 
 struct dvec {
 
-  size_t N;
+  size_t N, NA;
   cl::Buffer v;
   _cl_buffer_region *br{nullptr};
 
@@ -133,7 +133,9 @@ struct dmatrix {
 
 struct dsubspace {
 
-  size_t N, M;
+  size_t N,   //the logical size of N
+         NA,  //the actual size of N (for alignment and sub-buffering purposes
+         M;   //size of the subspace
   cl::Buffer v;
 
   dsubspace(size_t N, size_t M);

@@ -94,7 +94,7 @@ string splash::show_subspace(double *S, size_t N, size_t M) {
   ss << std::setprecision(3) << std::fixed;
   for(size_t i=0; i<N; ++i) {
     for(size_t j=0; j<M; ++j) {
-      ss << S[M*j+i] << "\t";
+      ss << S[N*j+i] << "\t";
     }
     ss << std::endl;
   }
@@ -237,28 +237,46 @@ dsubspace::zero() {
   cl::Kernel kmx_zero = cl::Kernel(ocl::get().libsplash, "mx_zero");
 
   kmx_zero.setArg(0, v);
-  kmx_zero.setArg(1, N);
+  kmx_zero.setArg(1, NA);
   kmx_zero.setArg(2, M);
   kmx_zero.setArg(3, ocl::get().ipt);
 
   ocl::get().q.enqueueNDRangeKernel(
       kmx_zero,
       cl::NullRange,
-      cl::NDRange{ocl::gsize(N*M)},
+      cl::NDRange{ocl::gsize(NA*M)},
       cl::NDRange{ocl::lsize()});
 
 }
 
+#include <iostream>
 dsubspace::dsubspace(size_t N, size_t M) 
-  : N{N}, M{M}, v{ocl::get().ctx, CL_MEM_READ_WRITE, sizeof(double)*N*M} { }
+  : N{N}, M{M} { 
+
+  size_t base_align = 
+    ocl::get()
+      .gpu
+      .getInfo<CL_DEVICE_MEM_BASE_ADDR_ALIGN>() / 8; //bits -> bytes
+
+  std::cout << "base align(bytes)=" << base_align << std::endl;
+
+  NA = N*sizeof(double);
+  NA += base_align - (NA % base_align);
+  NA /= sizeof(double);
+
+  v = cl::Buffer{ocl::get().ctx, CL_MEM_READ_WRITE, sizeof(double)*NA*M};
+}
 
 dvec dsubspace::operator () (size_t idx) {
 
   dvec x;
   x.N = N;
+  x.NA = NA;
   x.br = (_cl_buffer_region*)malloc(sizeof(_cl_buffer_region));
-  x.br->origin = N*idx;
-  x.br->size = N;
+  x.br->origin = NA*idx*sizeof(double);
+  x.br->size = NA*sizeof(double);
+  
+  std::cout << "origin=" << x.br->origin << std::endl;
 
   x.v = v.createSubBuffer(CL_MEM_READ_WRITE,
       CL_BUFFER_CREATE_TYPE_REGION,
@@ -270,12 +288,12 @@ dvec dsubspace::operator () (size_t idx) {
 
 double* dsubspace::readback() {
 
-  double *d = (double*)malloc(sizeof(double)*N*M);
+  double *d = (double*)malloc(sizeof(double)*NA*M);
   ocl::get().q.enqueueReadBuffer(
       v,
       CL_TRUE,
       0,
-      sizeof(double)*N*M,
+      sizeof(double)*NA*M,
       d);
 
   return d;

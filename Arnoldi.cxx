@@ -16,13 +16,15 @@ Arnoldi& Arnoldi::operator()() {
 
   Q.zero();
   Q(0) = xi / knorm(xi);
-  double *Q_h = Q.readback();
-  std::cout << show_subspace(Q_h, Q.N, Q.M) << std::endl;
 
-  for(size_t k=0; k<m; ++k) {
+  for(size_t k=0; k<m-1; ++k) {
 
+    Q(k+1) = (A * Q(k)) / knorm(Q(k));
 
   }
+  
+  double *Q_h = Q.readback();
+  std::cout << show_subspace(Q_h, Q.NA, Q.M) << std::endl;
 
   return *this;
 }
