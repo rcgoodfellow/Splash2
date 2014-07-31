@@ -103,7 +103,7 @@ struct dvec {
 
 std::string show_vec(double *v, size_t N);
 std::string show_matrix(double *A, size_t N, size_t M);
-std::string show_subspace(double *A, size_t N, size_t M);
+std::string show_subspace(double *A, size_t N, size_t NA, size_t M);
 
 
 struct dsmatrix {
@@ -137,13 +137,17 @@ struct dsubspace {
          NA,  //the actual size of N (for alignment and sub-buffering purposes
          M;   //size of the subspace
   cl::Buffer v;
+  _cl_buffer_region *br{nullptr};
 
-  dsubspace(size_t N, size_t M);
+  dsubspace(size_t N, size_t M, bool alloc = true);
   dvec operator () (size_t idx);
+  dsubspace operator () (size_t si, size_t fi);
   void zero();
   double* readback();
 
 };
+
+dvec transmult(const dsubspace &, const dvec &);
 
 struct dscalar {
   cl::Buffer v;

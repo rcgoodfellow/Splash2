@@ -88,13 +88,13 @@ string splash::show_matrix(double *A, size_t N, size_t M) {
 
 }
 
-string splash::show_subspace(double *S, size_t N, size_t M) {
+string splash::show_subspace(double *S, size_t N, size_t NA, size_t M) {
 
   stringstream ss;
   ss << std::setprecision(3) << std::fixed;
   for(size_t i=0; i<N; ++i) {
     for(size_t j=0; j<M; ++j) {
-      ss << S[N*j+i] << "\t";
+      ss << S[NA*j+i] << "\t";
     }
     ss << std::endl;
   }
@@ -249,8 +249,7 @@ dsubspace::zero() {
 
 }
 
-#include <iostream>
-dsubspace::dsubspace(size_t N, size_t M) 
+dsubspace::dsubspace(size_t N, size_t M, bool alloc) 
   : N{N}, M{M} { 
 
   size_t base_align = 
@@ -258,13 +257,13 @@ dsubspace::dsubspace(size_t N, size_t M)
       .gpu
       .getInfo<CL_DEVICE_MEM_BASE_ADDR_ALIGN>() / 8; //bits -> bytes
 
-  std::cout << "base align(bytes)=" << base_align << std::endl;
-
   NA = N*sizeof(double);
   NA += base_align - (NA % base_align);
   NA /= sizeof(double);
 
-  v = cl::Buffer{ocl::get().ctx, CL_MEM_READ_WRITE, sizeof(double)*NA*M};
+  if(alloc) {
+    v = cl::Buffer{ocl::get().ctx, CL_MEM_READ_WRITE, sizeof(double)*NA*M};
+  }
 }
 
 dvec dsubspace::operator () (size_t idx) {
@@ -275,8 +274,6 @@ dvec dsubspace::operator () (size_t idx) {
   x.br = (_cl_buffer_region*)malloc(sizeof(_cl_buffer_region));
   x.br->origin = NA*idx*sizeof(double);
   x.br->size = NA*sizeof(double);
-  
-  std::cout << "origin=" << x.br->origin << std::endl;
 
   x.v = v.createSubBuffer(CL_MEM_READ_WRITE,
       CL_BUFFER_CREATE_TYPE_REGION,
@@ -297,6 +294,29 @@ double* dsubspace::readback() {
       d);
 
   return d;
+
+}
+
+dsubspace dsubspace::operator () (size_t si, size_t fi) {
+
+  dsubspace S{N, fi-si, false};
+  S.br = (_cl_buffer_region*)malloc(sizeof(_cl_buffer_region));
+  S.br->origin = NA*si*sizeof(double);
+  S.br->size = NA*fi*sizeof(double) - S.br->origin;
+
+  S.v = v.createSubBuffer(CL_MEM_READ_WRITE,
+      CL_BUFFER_CREATE_TYPE_REGION,
+      S.br);
+
+  return S;
+
+}
+
+//subspace free functions......................................................
+
+dvec splash::transmult(const dsubspace & S, const dvec & x) {
+
+  //TODO
 
 }
 
