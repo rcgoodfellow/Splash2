@@ -24,11 +24,38 @@ splash::new_dvec(std::vector<double> values)
   return v;
 }
 
+dvec
+dvec::ones(size_t k) {
+
+  dvec x;
+  x.N = k;
+  x.v = cl::Buffer(ocl::get().ctx,
+      CL_MEM_READ_WRITE,
+      sizeof(double) * x.N);
+
+  cl::Kernel kvx_uset{ocl::get().libsplash, "vx_uset"};
+
+  kvx_uset.setArg(0, x.v);
+  kvx_uset.setArg(1, 1.0);
+  kvx_uset.setArg(2, x.N);
+  kvx_uset.setArg(3, ocl::get().ipt);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kvx_uset,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(x.N)},
+      cl::NDRange{ocl::lsize()});
+
+  return x;
+}
+
 dvec &
 dvec::operator = (const dvec &a) {
 
   if(a.N != N) {
-    throw runtime_error("assignment of incompatible dvecs");
+    throw runtime_error(
+        string("assignment of incompatible dvecs ")
+        + to_string(N) + " != " + to_string(a.N));
   }
 
   cl::Kernel kvx_set{ocl::get().libsplash, "vx_set"};
@@ -45,6 +72,71 @@ dvec::operator = (const dvec &a) {
       cl::NDRange{ocl::lsize()});
 
   return *this;
+}
+
+
+dsubvec dvec::operator() (size_t begin, size_t end) {
+  return dsubvec{begin, end, this};
+}
+
+dsubvec::dsubvec(size_t begin, size_t end, dvec *parent)
+  : begin{begin}, end{end}, parent{parent} { }
+
+dsubvec & dsubvec::operator = (const dvec &x) {
+
+  size_t N = end - begin + 1;
+  if(N != x.N) {
+    throw runtime_error(
+        string("incompatible subvec assignment from vec ")
+        + to_string(N) + " != " + to_string(x.N));
+  }
+
+  cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
+
+  kvx_sset.setArg(0, parent->v);
+  kvx_sset.setArg(1, x.v);
+  kvx_sset.setArg(2, N);
+  kvx_sset.setArg(3, begin);
+  kvx_sset.setArg(4, 0L);
+  kvx_sset.setArg(5, ocl::get().ipt);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kvx_sset,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(N)},
+      cl::NDRange{ocl::lsize()});
+
+  return *this;
+}
+
+dsubvec & dsubvec::operator = (const dsubvec &x) {
+
+  size_t N = end - begin + 1,
+         xN = x.end - x.begin + 1;
+
+  if(N != xN) {
+    throw runtime_error(
+        string("incompatible subvec assignment ")
+        + to_string(N) + " != " + to_string(xN));
+  }
+
+  cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
+
+  kvx_sset.setArg(0, parent->v);
+  kvx_sset.setArg(1, x.parent->v);
+  kvx_sset.setArg(2, N);
+  kvx_sset.setArg(3, begin);
+  kvx_sset.setArg(4, x.begin);
+  kvx_sset.setArg(5, ocl::get().ipt);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kvx_sset,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(N)},
+      cl::NDRange{ocl::lsize()});
+
+  return *this;
+
 }
 
 double*
@@ -299,10 +391,10 @@ double* dsubspace::readback() {
 
 dsubspace dsubspace::operator () (size_t si, size_t fi) {
 
-  dsubspace S{N, fi-si, false};
+  dsubspace S{N, fi-si+1, false};
   S.br = (_cl_buffer_region*)malloc(sizeof(_cl_buffer_region));
   S.br->origin = NA*si*sizeof(double);
-  S.br->size = NA*fi*sizeof(double) - S.br->origin;
+  S.br->size = NA*(fi+1)*sizeof(double) - S.br->origin;
 
   S.v = v.createSubBuffer(CL_MEM_READ_WRITE,
       CL_BUFFER_CREATE_TYPE_REGION,
@@ -314,9 +406,43 @@ dsubspace dsubspace::operator () (size_t si, size_t fi) {
 
 //subspace free functions......................................................
 
+#include <iostream>
 dvec splash::transmult(const dsubspace & S, const dvec & x) {
 
-  //TODO
+
+  if(S.N != x.N) {
+    throw runtime_error(
+        string("attempt to transmult incompatible subspace and vector")
+        + "S.N=" + to_string(S.N) + ", x.N=" + to_string(x.N)); 
+  }
+
+  dvec Sx;
+  Sx.N = S.M;
+
+  Sx.v = cl::Buffer{
+    ocl::get().ctx,
+    CL_MEM_READ_WRITE,
+    sizeof(double)*Sx.N};
+
+
+  std::cout << "transmult: N=" << S.N << " M=" << S.M << " NA=" << S.NA 
+            << std::endl;
+  cl::Kernel kmxvx_mul{ocl::get().libsplash, "mxvx_mul"};
+
+  kmxvx_mul.setArg(0, S.v);
+  kmxvx_mul.setArg(1, x.v);
+  kmxvx_mul.setArg(2, S.N);
+  kmxvx_mul.setArg(3, S.NA);
+  kmxvx_mul.setArg(4, S.M);
+  kmxvx_mul.setArg(5, Sx.v);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kmxvx_mul,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(S.M, false)},
+      cl::NDRange{ocl::lsize()});
+
+  return Sx;
 
 }
 
@@ -498,21 +624,21 @@ dvec splash::operator * (const dsmatrix &M, const dvec &v) {
       sizeof(double)*M.N);
 
   //matrix vector kernel setup and invocation
-  cl::Kernel kmul_mv = cl::Kernel(ocl::get().libsplash, "kmul_mv");
+  cl::Kernel ksmvx_mul = cl::Kernel(ocl::get().libsplash, "smvx_mul");
 
-  kmul_mv.setArg(0, M.n);
-  kmul_mv.setArg(1, M.N);
-  kmul_mv.setArg(2, M.v);
-  kmul_mv.setArg(3, M.ri);
-  kmul_mv.setArg(4, M.ci);
-  kmul_mv.setArg(5, v.v);
-  kmul_mv.setArg(6, Mv.v);
+  ksmvx_mul.setArg(0, M.n);
+  ksmvx_mul.setArg(1, M.N);
+  ksmvx_mul.setArg(2, M.v);
+  ksmvx_mul.setArg(3, M.ri);
+  ksmvx_mul.setArg(4, M.ci);
+  ksmvx_mul.setArg(5, v.v);
+  ksmvx_mul.setArg(6, Mv.v);
 
   size_t gsize = M.N;
   gsize += 256 - (gsize % 256);
 
   ocl::get().q.enqueueNDRangeKernel(
-      kmul_mv,
+      ksmvx_mul,
       cl::NullRange,
       cl::NDRange{gsize},
       cl::NDRange{256});

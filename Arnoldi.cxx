@@ -23,12 +23,11 @@ Arnoldi& Arnoldi::operator()() {
   for(size_t k=0; k<m-1; ++k) {
 
     //fascinating that this converges
-    Q(k+1) = (A * Q(k)) / knorm(Q(k));
+    //Q(k+1) = (A * Q(k)) / knorm(Q(k));
 
-    //Q(k+1) = A * Q(k);
-
-    
-    //H(k) = transmult(Q(0,k), H(k));
+    Q(k+1) = A * Q(k);
+    H(k)(0,k) = transmult(Q(0,k), Q(k+1));
+    //H(k)(0,k) = dvec::ones(k+1);
 
   }
 
@@ -37,10 +36,16 @@ Arnoldi& Arnoldi::operator()() {
   std::cout << "Q" << std::endl;
   std::cout << show_subspace(Q_h, Q.N, Q.NA, Q.M) << std::endl;
 
+  /*
   dsubspace QS47 = Q(4,7);
   double *QS47_h = QS47.readback();
   std::cout << "Q47" << std::endl;
   std::cout << show_subspace(QS47_h, QS47.N, QS47.NA, QS47.M) << std::endl;
+  */
+
+  double *H_h = H.readback();
+  std::cout << "H" << std::endl;
+  std::cout << show_subspace(H_h, H.N, H.NA, H.M) << std::endl;
 
   return *this;
 }

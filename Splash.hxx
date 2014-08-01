@@ -58,9 +58,11 @@ class ocl {
     cl::Program libsplash;
 
     size_t ipt{64};
-    static size_t gsize(size_t N) {
+    static size_t gsize(size_t N, bool distribute_over_ipt=true) {
 
-      size_t gsz = static_cast<size_t>(ceil(N/64.0));
+      float divisor = 1.0f;
+      if(distribute_over_ipt) { divisor = 64.0f; }
+      size_t gsz = static_cast<size_t>(ceil(N/divisor));
       gsz += 256 - (gsz % 256);
       return gsz;
 
@@ -89,13 +91,29 @@ class ocl {
     void operator=(const ocl &) = delete;
 };
 
+struct dvec;
+
+struct dsubvec {
+  size_t begin, end;
+  dvec *parent;
+
+  dsubvec(size_t begin, size_t end, dvec *parent);
+
+  dsubvec & operator = (const dvec &);
+  dsubvec & operator = (const dsubvec &);
+
+};
+
 struct dvec {
 
   size_t N, NA;
   cl::Buffer v;
   _cl_buffer_region *br{nullptr};
 
+  static dvec ones(size_t);
+
   dvec & operator = (const dvec &);
+  dsubvec operator() (size_t begin, size_t end);
 
   double* readback();
 

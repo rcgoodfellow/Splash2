@@ -34,4 +34,3 @@ mx_zero(
   for(ulong i=begin; i<end; ++i) { A[i] = 0; }
 
 }
-
