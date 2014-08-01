@@ -24,14 +24,15 @@ Arnoldi& Arnoldi::operator()() {
 
     //fascinating that this converges
     //Q(k+1) = (A * Q(k)) / knorm(Q(k));
+    //H(k)(0,k) = dvec::ones(k+1);
 
     Q(k+1) = A * Q(k);
     H(k)(0,k) = transmult(Q(0,k), Q(k+1));
-    //H(k)(0,k) = dvec::ones(k+1);
+    Q(k+1) = Q(k+1) - Q(0,k) * H(k)(0,k);
 
   }
 
-  
+ 
   double *Q_h = Q.readback();
   std::cout << "Q" << std::endl;
   std::cout << show_subspace(Q_h, Q.N, Q.NA, Q.M) << std::endl;

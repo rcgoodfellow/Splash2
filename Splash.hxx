@@ -97,6 +97,8 @@ struct dsubvec {
   size_t begin, end;
   dvec *parent;
 
+  size_t N() const;
+
   dsubvec(size_t begin, size_t end, dvec *parent);
 
   dsubvec & operator = (const dvec &);
@@ -111,6 +113,9 @@ struct dvec {
   _cl_buffer_region *br{nullptr};
 
   static dvec ones(size_t);
+
+  dvec() = default;
+  explicit dvec(size_t N);
 
   dvec & operator = (const dvec &);
   dsubvec operator() (size_t begin, size_t end);
@@ -172,26 +177,30 @@ struct dscalar {
   double readback();
 };
 
-//operators ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//vector unary ................................................................
-dscalar knorm(const dvec&);
-
-//vector reducers .............................................................
+//reducers ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 dscalar redux_add(const dvec&);
 
-//vector-vector binary ........................................................
+//operators ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+//vector ......................................................................
+dscalar knorm(const dvec&);
+
+//scalar ......................................................................
+dscalar ksqrt(const dscalar&);
+
+//vector-vector ...............................................................
 dscalar operator * (const dvec&, const dvec&);
 dvec operator + (const dvec&, const dvec&);
 dvec operator - (const dvec&, const dvec&);
 
-//vector-scalar binary ........................................................
+//vector-scalar ...............................................................
 dvec operator / (const dvec&, const dscalar&);
 
-//matrix-vector binary ........................................................
+//matrix-vector ...............................................................
 dvec operator * (const dsmatrix&, const dvec&);
 
-//scalar unary ................................................................
-dscalar ksqrt(const dscalar&);
+//subspace-subvec .............................................................
+dvec operator * (const dsubspace&, const dsubvec&);
+
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

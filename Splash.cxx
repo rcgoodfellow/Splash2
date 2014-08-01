@@ -24,6 +24,10 @@ splash::new_dvec(std::vector<double> values)
   return v;
 }
 
+dvec::dvec(size_t N) 
+  : N{N}, 
+    v{ocl::get().ctx, CL_MEM_READ_WRITE, sizeof(double)*N} { }
+
 dvec
 dvec::ones(size_t k) {
 
@@ -81,6 +85,8 @@ dsubvec dvec::operator() (size_t begin, size_t end) {
 
 dsubvec::dsubvec(size_t begin, size_t end, dvec *parent)
   : begin{begin}, end{end}, parent{parent} { }
+
+size_t dsubvec::N() const { return end - begin + 1; }
 
 dsubvec & dsubvec::operator = (const dvec &x) {
 
@@ -406,7 +412,6 @@ dsubspace dsubspace::operator () (size_t si, size_t fi) {
 
 //subspace free functions......................................................
 
-#include <iostream>
 dvec splash::transmult(const dsubspace & S, const dvec & x) {
 
 
@@ -416,25 +421,17 @@ dvec splash::transmult(const dsubspace & S, const dvec & x) {
         + "S.N=" + to_string(S.N) + ", x.N=" + to_string(x.N)); 
   }
 
-  dvec Sx;
-  Sx.N = S.M;
+  dvec Sx(S.M);
 
-  Sx.v = cl::Buffer{
-    ocl::get().ctx,
-    CL_MEM_READ_WRITE,
-    sizeof(double)*Sx.N};
-
-
-  std::cout << "transmult: N=" << S.N << " M=" << S.M << " NA=" << S.NA 
-            << std::endl;
   cl::Kernel kmxvx_mul{ocl::get().libsplash, "mxvx_mul"};
 
   kmxvx_mul.setArg(0, S.v);
   kmxvx_mul.setArg(1, x.v);
-  kmxvx_mul.setArg(2, S.N);
-  kmxvx_mul.setArg(3, S.NA);
-  kmxvx_mul.setArg(4, S.M);
-  kmxvx_mul.setArg(5, Sx.v);
+  kmxvx_mul.setArg(2, 0L);
+  kmxvx_mul.setArg(3, S.N);
+  kmxvx_mul.setArg(4, S.NA);
+  kmxvx_mul.setArg(5, S.M);
+  kmxvx_mul.setArg(6, Sx.v);
 
   ocl::get().q.enqueueNDRangeKernel(
       kmxvx_mul,
@@ -645,6 +642,36 @@ dvec splash::operator * (const dsmatrix &M, const dvec &v) {
 
   return Mv;
 
+}
+
+dvec splash::operator * (const dsubspace & S, const dsubvec & x) {
+
+  if(S.M != x.N()) {
+    throw runtime_error(
+        string("Attempt to multiply incompatible subspace and vector")
+        + to_string(S.M) + " != " + to_string(x.N())
+        );
+  }
+
+  dvec Sx(S.N);
+
+  cl::Kernel kmxvx_mul{ocl::get().libsplash, "mxvx_mul"};
+
+  kmxvx_mul.setArg(0, S.v);
+  kmxvx_mul.setArg(1, x.parent->v);
+  kmxvx_mul.setArg(2, x.begin);
+  kmxvx_mul.setArg(3, S.M);
+  kmxvx_mul.setArg(4, S.M);
+  kmxvx_mul.setArg(5, S.N);
+  kmxvx_mul.setArg(6, Sx.v);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kmxvx_mul,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(S.N, false)},
+      cl::NDRange{ocl::lsize()});
+
+  return Sx;
 }
 
 dscalar splash::ksqrt(const dscalar &s) {

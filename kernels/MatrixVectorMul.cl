@@ -26,6 +26,7 @@ void
 mxvx_mul(
     __global double *A,
     __global double *v,
+    ulong off,
     ulong N,
     ulong NA,
     ulong M,
@@ -35,5 +36,5 @@ mxvx_mul(
   if(tid >= M) { return; }
 
   Av[tid] = 0.0;
-  for(size_t i=0; i<N; ++i) { Av[tid] += A[NA*tid + i] * v[i]; }
+  for(size_t i=0; i<N; ++i) { Av[tid] += A[NA*tid + i] * v[i+off]; }
 }
