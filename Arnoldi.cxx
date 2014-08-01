@@ -29,6 +29,18 @@ Arnoldi& Arnoldi::operator()() {
     Q(k+1) = A * Q(k);
     H(k)(0,k) = transmult(Q(0,k), Q(k+1));
     Q(k+1) = Q(k+1) - Q(0,k) * H(k)(0,k);
+    dvec s = transmult(Q(0,k), Q(k+1));
+    Q(k+1) = Q(k+1) - Q(0,k) * s;
+    H(k)(0,k) = H(k)(0,k) + s;
+    H(k)(k+1) = knorm(Q(k+1));
+
+    double *_alpha_ = H(k)(k+1).readback();
+    std::cout 
+      << std::setprecision(6) << std::fixed
+      << "~~{alpha}~~{" << *_alpha_ << "}~~~" 
+      << std::endl;
+
+    Q(k+1) = Q(k+1) / H(k)(k+1);
 
   }
 

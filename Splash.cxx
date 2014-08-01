@@ -79,8 +79,12 @@ dvec::operator = (const dvec &a) {
 }
 
 
-dsubvec dvec::operator() (size_t begin, size_t end) {
+dsubvec dvec::operator () (size_t begin, size_t end) {
   return dsubvec{begin, end, this};
+}
+
+dsubvec dvec::operator () (size_t idx) {
+  return dsubvec{idx, idx, this};
 }
 
 dsubvec::dsubvec(size_t begin, size_t end, dvec *parent)
@@ -90,18 +94,17 @@ size_t dsubvec::N() const { return end - begin + 1; }
 
 dsubvec & dsubvec::operator = (const dvec &x) {
 
-  size_t N = end - begin + 1;
-  if(N != x.N) {
+  if(N() != x.N) {
     throw runtime_error(
         string("incompatible subvec assignment from vec ")
-        + to_string(N) + " != " + to_string(x.N));
+        + to_string(N()) + " != " + to_string(x.N));
   }
 
   cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
 
   kvx_sset.setArg(0, parent->v);
   kvx_sset.setArg(1, x.v);
-  kvx_sset.setArg(2, N);
+  kvx_sset.setArg(2, N());
   kvx_sset.setArg(3, begin);
   kvx_sset.setArg(4, 0L);
   kvx_sset.setArg(5, ocl::get().ipt);
@@ -109,7 +112,7 @@ dsubvec & dsubvec::operator = (const dvec &x) {
   ocl::get().q.enqueueNDRangeKernel(
       kvx_sset,
       cl::NullRange,
-      cl::NDRange{ocl::gsize(N)},
+      cl::NDRange{ocl::gsize(N())},
       cl::NDRange{ocl::lsize()});
 
   return *this;
@@ -117,20 +120,17 @@ dsubvec & dsubvec::operator = (const dvec &x) {
 
 dsubvec & dsubvec::operator = (const dsubvec &x) {
 
-  size_t N = end - begin + 1,
-         xN = x.end - x.begin + 1;
-
-  if(N != xN) {
+  if(N() != x.N()) {
     throw runtime_error(
         string("incompatible subvec assignment ")
-        + to_string(N) + " != " + to_string(xN));
+        + to_string(N()) + " != " + to_string(x.N()));
   }
 
   cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
 
   kvx_sset.setArg(0, parent->v);
   kvx_sset.setArg(1, x.parent->v);
-  kvx_sset.setArg(2, N);
+  kvx_sset.setArg(2, N());
   kvx_sset.setArg(3, begin);
   kvx_sset.setArg(4, x.begin);
   kvx_sset.setArg(5, ocl::get().ipt);
@@ -138,11 +138,38 @@ dsubvec & dsubvec::operator = (const dsubvec &x) {
   ocl::get().q.enqueueNDRangeKernel(
       kvx_sset,
       cl::NullRange,
-      cl::NDRange{ocl::gsize(N)},
+      cl::NDRange{ocl::gsize(N())},
       cl::NDRange{ocl::lsize()});
 
   return *this;
 
+}
+
+dsubvec & dsubvec::operator = (const dscalar &x) {
+
+  if(N() != 1) {
+    throw runtime_error(
+        string("attempt to assign scalar to subvec of size greater than 1")
+        + to_string(N()) + " != 1");
+  }
+
+  cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
+
+  kvx_sset.setArg(0, parent->v);
+  kvx_sset.setArg(1, x.v);
+  kvx_sset.setArg(2, 1L);
+  kvx_sset.setArg(3, begin);
+  kvx_sset.setArg(4, 0L);
+  kvx_sset.setArg(5, ocl::get().ipt);
+
+  //TODO: this enqueue is dumb, there is only 1 thread needed here
+  ocl::get().q.enqueueNDRangeKernel(
+      kvx_sset,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(N())},
+      cl::NDRange{ocl::lsize()});
+
+  return *this;
 }
 
 double*
@@ -157,6 +184,13 @@ dvec::readback() {
       r);
 
   return r;
+}
+
+double*
+dsubvec::readback() {
+  
+  double *r = parent->readback();
+  return r+begin;
 }
 
 string splash::show_vec(double *v, size_t N) {
@@ -590,17 +624,15 @@ dscalar splash::operator* (const dvec &a, const dvec &b) {
   kmul_vv.setArg(1, b.v);
   kmul_vv.setArg(2, a.N);
   kmul_vv.setArg(3, ocl::get().ipt);
-  kmul_vv.setArg(4, s.v);
-
-  //global work size needs to be a multiple of the local work size (256)
-  size_t gsize = static_cast<size_t>(ceil(a.N/ocl::get().ipt));
-  gsize += 256 - (gsize % 256);
+  kmul_vv.setArg(4, 0L);
+  kmul_vv.setArg(5, 0L);
+  kmul_vv.setArg(6, s.v);
 
   ocl::get().q.enqueueNDRangeKernel(
       kmul_vv,
       cl::NullRange,
-      cl::NDRange{gsize},
-      cl::NDRange{256});
+      cl::NDRange{ocl::gsize(a.N)},
+      cl::NDRange{ocl::lsize()});
  
   return redux_add(s);
 }
@@ -648,9 +680,8 @@ dvec splash::operator * (const dsubspace & S, const dsubvec & x) {
 
   if(S.M != x.N()) {
     throw runtime_error(
-        string("Attempt to multiply incompatible subspace and vector")
-        + to_string(S.M) + " != " + to_string(x.N())
-        );
+        string("Attempt to multiply incompatible subspace and subvector")
+        + to_string(S.M) + " != " + to_string(x.N()));
   }
 
   dvec Sx(S.N);
@@ -672,6 +703,37 @@ dvec splash::operator * (const dsubspace & S, const dsubvec & x) {
       cl::NDRange{ocl::lsize()});
 
   return Sx;
+}
+
+dvec splash::operator * (const dsubspace & S, const dvec & x) {
+
+  if(S.M != x.N) {
+    throw runtime_error(
+        string("Attempt to multiply incompatible subspace and vector")
+        + to_string(S.M) + " != " + to_string(x.N));
+  }
+
+  dvec Sx(S.N);
+
+  cl::Kernel kmxvx_mul{ocl::get().libsplash, "mxvx_mul"};
+  
+  kmxvx_mul.setArg(0, S.v);
+  kmxvx_mul.setArg(1, x.v);
+  kmxvx_mul.setArg(2, 0L);
+  kmxvx_mul.setArg(3, S.M);
+  kmxvx_mul.setArg(4, S.M);
+  kmxvx_mul.setArg(5, S.N);
+  kmxvx_mul.setArg(6, Sx.v);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kmxvx_mul,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(S.N, false)},
+      cl::NDRange{ocl::lsize()});
+
+  return Sx;
+
+
 }
 
 dscalar splash::ksqrt(const dscalar &s) {
@@ -728,30 +790,49 @@ dscalar splash::knorm(const dvec &v) {
 
 dvec splash::operator / (const dvec &v, const dscalar &s) {
 
-  dvec vds{};
-  vds.v = cl::Buffer(ocl::get().ctx,
-      CL_MEM_READ_WRITE,
-      sizeof(double)*v.N);
-  vds.N = v.N;
+  dvec vds(v.N);
 
-  cl::Kernel kdiv_vs = cl::Kernel(ocl::get().libsplash, "kdiv_vs");
+  cl::Kernel kdiv_vs{ocl::get().libsplash, "kdiv_vs"};
 
   kdiv_vs.setArg(0, v.v);
   kdiv_vs.setArg(1, s.v);
   kdiv_vs.setArg(2, v.N);
-  kdiv_vs.setArg(3, 64L);
-  kdiv_vs.setArg(4, vds.v);
-
-  size_t gsize = v.N;
-  gsize += 256 - (gsize % 256);
+  kdiv_vs.setArg(3, ocl::get().ipt);
+  kdiv_vs.setArg(4, 0L);
+  kdiv_vs.setArg(5, 0L);
+  kdiv_vs.setArg(6, vds.v);
 
   ocl::get().q.enqueueNDRangeKernel(
       kdiv_vs,
       cl::NullRange,
-      cl::NDRange{gsize},
-      cl::NDRange{256});
+      cl::NDRange{ocl::gsize(v.N)},
+      cl::NDRange{ocl::lsize()});
 
   return vds;
+}
+
+dvec splash::operator / (const dvec & v, const dsubvec & s) {
+
+  dvec vds(v.N);
+
+  cl::Kernel kdiv_vs{ocl::get().libsplash, "kdiv_vs"};
+
+  kdiv_vs.setArg(0, v.v);
+  kdiv_vs.setArg(1, s.parent->v);
+  kdiv_vs.setArg(2, v.N);
+  kdiv_vs.setArg(3, ocl::get().ipt);
+  kdiv_vs.setArg(4, 0L);
+  kdiv_vs.setArg(5, s.begin);
+  kdiv_vs.setArg(6, vds.v);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kdiv_vs,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(v.N)},
+      cl::NDRange{ocl::lsize()});
+
+  return vds;
+
 }
 
 dvec splash::operator + (const dvec &a, const dvec &b) {
@@ -761,30 +842,55 @@ dvec splash::operator + (const dvec &a, const dvec &b) {
     throw runtime_error("Attempt to add incompatible vectors"); 
   }
 
-  dvec ab{};
-  ab.v = cl::Buffer(ocl::get().ctx,
-      CL_MEM_READ_WRITE,
-      sizeof(double)*a.N);
-  ab.N = a.N;
+  dvec ab(a.N);
 
-  cl::Kernel kadd_vv = cl::Kernel(ocl::get().libsplash, "kadd_vv");
+  cl::Kernel kadd_vv{ocl::get().libsplash, "kadd_vv"};
 
   kadd_vv.setArg(0, a.v);
   kadd_vv.setArg(1, b.v);
   kadd_vv.setArg(2, a.N);
-  kadd_vv.setArg(3, 64L);
-  kadd_vv.setArg(4, ab.v);
-
-  size_t gsize = a.N;
-  gsize += 256 - (gsize & 256);
+  kadd_vv.setArg(3, ocl::get().ipt);
+  kadd_vv.setArg(4, 0L);
+  kadd_vv.setArg(5, 0L);
+  kadd_vv.setArg(6, ab.v);
 
   ocl::get().q.enqueueNDRangeKernel(
       kadd_vv,
       cl::NullRange,
-      cl::NDRange{gsize},
-      cl::NDRange{256});
+      cl::NDRange{ocl::gsize(a.N)},
+      cl::NDRange{ocl::lsize()});
 
   return ab;
+}
+
+dvec splash::operator + (const dsubvec & a, const dvec & b) {
+
+  if(a.N() != b.N) {
+    throw runtime_error(
+        string("Attempt to add incompatible subvec and vec")
+        + to_string(a.N()) + " != " + to_string(b.N));
+  }
+
+  dvec ab(b.N);
+
+  cl::Kernel kadd_vv{ocl::get().libsplash, "kadd_vv"};
+
+  kadd_vv.setArg(0, a.parent->v);
+  kadd_vv.setArg(1, b.v);
+  kadd_vv.setArg(2, b.N);
+  kadd_vv.setArg(3, ocl::get().ipt);
+  kadd_vv.setArg(4, a.begin);
+  kadd_vv.setArg(5, 0L);
+  kadd_vv.setArg(6, ab.v);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      kadd_vv,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(b.N)},
+      cl::NDRange{ocl::lsize()});
+
+  return ab;
+
 }
 
 dvec splash::operator - (const dvec &a, const dvec &b) {
@@ -805,17 +911,16 @@ dvec splash::operator - (const dvec &a, const dvec &b) {
   ksub_vv.setArg(0, a.v);
   ksub_vv.setArg(1, b.v);
   ksub_vv.setArg(2, a.N);
-  ksub_vv.setArg(3, 64L);
-  ksub_vv.setArg(4, ab.v);
-
-  size_t gsize = a.N;
-  gsize += 256 - (gsize & 256);
+  ksub_vv.setArg(3, ocl::get().ipt);
+  ksub_vv.setArg(4, 0L);
+  ksub_vv.setArg(5, 0L);
+  ksub_vv.setArg(6, ab.v);
 
   ocl::get().q.enqueueNDRangeKernel(
       ksub_vv,
       cl::NullRange,
-      cl::NDRange{gsize},
-      cl::NDRange{256});
+      cl::NDRange{ocl::gsize(a.N)},
+      cl::NDRange{ocl::lsize()});
 
   return ab;
 }

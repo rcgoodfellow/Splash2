@@ -93,6 +93,12 @@ class ocl {
 
 struct dvec;
 
+struct dscalar {
+  cl::Buffer v;
+
+  double readback();
+};
+
 struct dsubvec {
   size_t begin, end;
   dvec *parent;
@@ -103,8 +109,12 @@ struct dsubvec {
 
   dsubvec & operator = (const dvec &);
   dsubvec & operator = (const dsubvec &);
+  dsubvec & operator = (const dscalar &);
+
+  double* readback();
 
 };
+
 
 struct dvec {
 
@@ -118,6 +128,7 @@ struct dvec {
   explicit dvec(size_t N);
 
   dvec & operator = (const dvec &);
+  dsubvec operator() (size_t idx);
   dsubvec operator() (size_t begin, size_t end);
 
   double* readback();
@@ -172,10 +183,6 @@ struct dsubspace {
 
 dvec transmult(const dsubspace &, const dvec &);
 
-struct dscalar {
-  cl::Buffer v;
-  double readback();
-};
 
 //reducers ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 dscalar redux_add(const dvec&);
@@ -190,16 +197,21 @@ dscalar ksqrt(const dscalar&);
 //vector-vector ...............................................................
 dscalar operator * (const dvec&, const dvec&);
 dvec operator + (const dvec&, const dvec&);
+dvec operator + (const dsubvec&, const dvec&);
 dvec operator - (const dvec&, const dvec&);
 
 //vector-scalar ...............................................................
 dvec operator / (const dvec&, const dscalar&);
+dvec operator / (const dvec&, const dsubvec&);
 
 //matrix-vector ...............................................................
 dvec operator * (const dsmatrix&, const dvec&);
 
 //subspace-subvec .............................................................
 dvec operator * (const dsubspace&, const dsubvec&);
+
+//subspace-vec ................................................................
+dvec operator * (const dsubspace&, const dvec&);
 
 
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

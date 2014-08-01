@@ -62,13 +62,13 @@ __kernel \
 void \
 NAME( \
     __global REAL *x, __global REAL *s, unsigned long N, unsigned long ipt, \
-    __global REAL *result \
+    ulong xoff, ulong yoff, __global REAL *result \
     ) { \
 \
   size_t tid = get_global_id(0); \
   if(tid >= N) { return; } \
   size_t begin = tid*ipt, end = min(begin + ipt, N); \
-  for(size_t i=begin; i<end; ++i) { result[i] = OP(x[i], *s); } \
+  for(size_t i=begin; i<end; ++i) { result[i] = OP(x[xoff+i], s[yoff]); } \
 }
 
 REAL div(REAL a, REAL b) { return a / b; }
@@ -101,13 +101,13 @@ __kernel \
 void \
 NAME( \
     __global REAL *x, __global REAL* y, unsigned long N, unsigned long ipt, \
-    __global REAL *result \
+    ulong xoff, ulong yoff, __global REAL *result \
     ) { \
 \
   size_t tid = get_global_id(0); \
   if(tid >= N) { return; } \
   size_t begin = tid*ipt, end = min(begin + ipt, N); \
-  for(size_t i=begin; i<end; ++i) { result[i] = OP(x[i], y[i]); } \
+  for(size_t i=begin; i<end; ++i) { result[i] = OP(x[i+xoff], y[i+yoff]); } \
 }
 
 ELEMENTAL_BINOP_VV(kdiv_vv, div)
