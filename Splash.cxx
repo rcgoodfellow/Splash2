@@ -80,15 +80,15 @@ dvec::operator = (const dvec &a) {
 
 
 dsubvec dvec::operator () (size_t begin, size_t end) {
-  return dsubvec{begin, end, this};
+  return dsubvec{begin, end, v, (size_t)fmax(N, NA)};
 }
 
 dsubvec dvec::operator () (size_t idx) {
-  return dsubvec{idx, idx, this};
+  return dsubvec{idx, idx, v, (size_t)fmax(N, NA)};
 }
 
-dsubvec::dsubvec(size_t begin, size_t end, dvec *parent)
-  : begin{begin}, end{end}, parent{parent} { }
+dsubvec::dsubvec(size_t begin, size_t end, cl::Buffer v, size_t NA)
+  : begin{begin}, end{end}, v{v}, NA{NA} { }
 
 size_t dsubvec::N() const { return end - begin + 1; }
 
@@ -102,7 +102,7 @@ dsubvec & dsubvec::operator = (const dvec &x) {
 
   cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
 
-  kvx_sset.setArg(0, parent->v);
+  kvx_sset.setArg(0, v);
   kvx_sset.setArg(1, x.v);
   kvx_sset.setArg(2, N());
   kvx_sset.setArg(3, begin);
@@ -128,8 +128,8 @@ dsubvec & dsubvec::operator = (const dsubvec &x) {
 
   cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
 
-  kvx_sset.setArg(0, parent->v);
-  kvx_sset.setArg(1, x.parent->v);
+  kvx_sset.setArg(0, v);
+  kvx_sset.setArg(1, x.v);
   kvx_sset.setArg(2, N());
   kvx_sset.setArg(3, begin);
   kvx_sset.setArg(4, x.begin);
@@ -155,7 +155,7 @@ dsubvec & dsubvec::operator = (const dscalar &x) {
 
   cl::Kernel kvx_sset{ocl::get().libsplash, "vx_sset"};
 
-  kvx_sset.setArg(0, parent->v);
+  kvx_sset.setArg(0, v);
   kvx_sset.setArg(1, x.v);
   kvx_sset.setArg(2, 1L);
   kvx_sset.setArg(3, begin);
@@ -174,13 +174,14 @@ dsubvec & dsubvec::operator = (const dscalar &x) {
 
 double*
 dvec::readback() {
-  
-  double *r = (double*)malloc(sizeof(double)*N);
+ 
+  size_t sz = fmax(N, NA);
+  double *r = (double*)malloc(sizeof(double)*sz);
   ocl::get().q.enqueueReadBuffer(
       v,
       CL_TRUE,
       0,
-      sizeof(double)*N,
+      sizeof(double)*sz,
       r);
 
   return r;
@@ -189,14 +190,26 @@ dvec::readback() {
 double*
 dsubvec::readback() {
   
-  double *r = parent->readback();
+  double *r = (double*)malloc(sizeof(double)*NA);
+  ocl::get().q.enqueueReadBuffer(
+      v,
+      CL_TRUE,
+      0,
+      sizeof(double)*NA,
+      r);
+
   return r+begin;
+  
 }
 
 string splash::show_vec(double *v, size_t N) {
 
   stringstream ss;
   ss << "[";
+  if(N == 0) {
+    ss << "]";
+    return ss.str();
+  }
   for(size_t i=0; i<N-1; ++i) {
     ss << v[i] << ","; 
   }
@@ -686,14 +699,14 @@ dvec splash::operator * (const dsubspace & S, const dsubvec & x) {
 
   dvec Sx(S.N);
 
-  cl::Kernel kmxvx_mul{ocl::get().libsplash, "mxvx_mul"};
+  cl::Kernel kmxvx_mul{ocl::get().libsplash, "sxvx_mul"};
 
   kmxvx_mul.setArg(0, S.v);
-  kmxvx_mul.setArg(1, x.parent->v);
+  kmxvx_mul.setArg(1, x.v);
   kmxvx_mul.setArg(2, x.begin);
   kmxvx_mul.setArg(3, S.M);
-  kmxvx_mul.setArg(4, S.M);
-  kmxvx_mul.setArg(5, S.N);
+  kmxvx_mul.setArg(4, S.N);
+  kmxvx_mul.setArg(5, S.NA);
   kmxvx_mul.setArg(6, Sx.v);
 
   ocl::get().q.enqueueNDRangeKernel(
@@ -818,7 +831,7 @@ dvec splash::operator / (const dvec & v, const dsubvec & s) {
   cl::Kernel kdiv_vs{ocl::get().libsplash, "kdiv_vs"};
 
   kdiv_vs.setArg(0, v.v);
-  kdiv_vs.setArg(1, s.parent->v);
+  kdiv_vs.setArg(1, s.v);
   kdiv_vs.setArg(2, v.N);
   kdiv_vs.setArg(3, ocl::get().ipt);
   kdiv_vs.setArg(4, 0L);
@@ -875,7 +888,7 @@ dvec splash::operator + (const dsubvec & a, const dvec & b) {
 
   cl::Kernel kadd_vv{ocl::get().libsplash, "kadd_vv"};
 
-  kadd_vv.setArg(0, a.parent->v);
+  kadd_vv.setArg(0, a.v);
   kadd_vv.setArg(1, b.v);
   kadd_vv.setArg(2, b.N);
   kadd_vv.setArg(3, ocl::get().ipt);

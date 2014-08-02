@@ -101,11 +101,12 @@ struct dscalar {
 
 struct dsubvec {
   size_t begin, end;
-  dvec *parent;
+  cl::Buffer v;
 
   size_t N() const;
+  size_t NA;
 
-  dsubvec(size_t begin, size_t end, dvec *parent);
+  dsubvec(size_t begin, size_t end, cl::Buffer v, size_t NA);
 
   dsubvec & operator = (const dvec &);
   dsubvec & operator = (const dsubvec &);
@@ -118,7 +119,7 @@ struct dsubvec {
 
 struct dvec {
 
-  size_t N, NA;
+  size_t N, NA{0};
   cl::Buffer v;
   _cl_buffer_region *br{nullptr};
 

@@ -38,3 +38,22 @@ mxvx_mul(
   Av[tid] = 0.0;
   for(size_t i=0; i<N; ++i) { Av[tid] += A[NA*tid + i] * v[i+off]; }
 }
+
+__kernel
+void
+sxvx_mul(
+    __global double *S,
+    __global double *x,
+    ulong off,
+    ulong M,
+    ulong N,
+    ulong NA,
+    __global double *Sx) {
+
+  size_t tid = get_global_id(0);
+  if(tid >= N) { return; }
+
+  Sx[tid] = 0.0;
+  for(size_t i=0; i<M; ++i) { Sx[tid] += S[NA*i + tid] * x[i+off]; }
+
+}
