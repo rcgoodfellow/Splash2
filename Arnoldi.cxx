@@ -1,5 +1,4 @@
 #include "Arnoldi.hxx"
-#include <iostream>
 
 using namespace splash;
 using std::runtime_error;
@@ -17,81 +16,43 @@ Arnoldi& Arnoldi::operator()() {
   //zero out for debugging
   Q.zero();
   H.zero();
+ 
 
-  Q(0) = xi / knorm(xi);
+  Q(0) = xi / norm(xi);  //first subspace elem is norm of residual
 
-  size_t sz;
+  size_t k;
+  for(k=0; k<m-1; ++k) {
 
-  for(size_t k=0; k<m-1; ++k) {
-
-    //create the next basis vector
+    //create next basis vector
     Q(k+1) = A * Q(k);
-    
-    //create the orthogonalizing components for Q(k+1)
+    //orthogonalize
     H(k)(0,k) = transmult(Q(0,k), Q(k+1));
-
-    //orthogonalize Q(k+1) w.r.t Q(0,k)
-
-    dsubspace Q0k = Q(0,k);
-    dsubvec Hks = H(k)(0,k);
-    dvec QH = Q0k * Hks;
-    //dsubvec Hks = Hk(0,k);
-
-    std::cout 
-      << "Q(0," << k << ")" << std::endl
-      << show_subspace(Q0k.readback(), Q0k.N, Q0k.NA, Q0k.M) << std::endl;
-
-    std::cout << "H(" << k << ")(0," << k << ")" << std::endl;
-    std::cout << "Hk.N()=" << Hks.N() << std::endl;
-    std::cout << show_vec(Hks.readback(), Hks.N()) << std::endl;
-
-    std::cout 
-      << "QH N=" << QH.N << std::endl
-      << show_vec(QH.readback(), QH.N) << std::endl;
-
-    Q(k+1) = Q(k+1) - Q(0,k) * H(k)(0,k);
-
+    Q(k+1) = Q(k+1) - Q(0,k) * H(k)(0,k);  
+    //reorthogonalize
     dvec s = transmult(Q(0,k), Q(k+1));
-
     Q(k+1) = Q(k+1) - Q(0,k) * s;
-
     H(k)(0,k) = H(k)(0,k) + s;
-
-    H(k)(k+1) = knorm(Q(k+1));
-
-    double *_alpha_ = H(k)(k+1).readback();
-    std::cout 
-      << std::setprecision(6) << std::fixed
-      << "~~~{alpha}~~{" << *_alpha_ << "}~~~" 
-      << std::endl;
-
+    //set Hessenberg subdiagonal
+    H(k)(k+1) = norm(Q(k+1));               
+    //test for subspace invariance break if so
+    double *_alpha_ = H(k)(k+1).readback(); 
     if(*_alpha_ < 1e-6) {
-      std::cout << "convergence reached" << std::endl;
       break;
-      sz = k+1;
     }
-
-    Q(k+1) = Q(k+1) / H(k)(k+1);
-
-    sz = k+1;
+    //normalize Q(k+1)
+    Q(k+1) = Q(k+1) / H(k)(k+1);            
 
   }
 
- 
-  double *Q_h = Q.readback();
-  std::cout << "Q" << std::endl;
-  std::cout << show_subspace(Q_h, Q.N, Q.NA, sz) << std::endl;
 
-  /*
-  dsubspace QS47 = Q(4,7);
-  double *QS47_h = QS47.readback();
-  std::cout << "Q47" << std::endl;
-  std::cout << show_subspace(QS47_h, QS47.N, QS47.NA, QS47.M) << std::endl;
-  */
-
-  double *H_h = H.readback();
-  std::cout << "H" << std::endl;
-  std::cout << show_subspace(H_h, H.N, H.NA, H.M) << std::endl;
+  //TODO: Should actually shrink subspace size
+  //Q.fitM(k+1);
+  //H.fit(k+1, k+1);
+  //TODO: H is not really a subspace
+  Q.M = k+1;
+  H.N = k+1;
+  H.M = k+1;
 
   return *this;
+
 }

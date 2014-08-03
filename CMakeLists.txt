@@ -15,6 +15,7 @@ ADD_LIBRARY(SplashRuntime SHARED
   SparseMatrix.c SparseMatrix.h
   SparseMatrix.cxx SparseMatrix.hxx
   Arnoldi.cxx Arnoldi.hxx
+  DB.cxx DB.hxx
   )
 
 ADD_EXECUTABLE(HelloSplash HelloSplash.cxx)
@@ -22,3 +23,6 @@ TARGET_LINK_LIBRARIES(HelloSplash SplashRuntime OpenCL)
 
 ADD_EXECUTABLE(ArnoldiTests ArnoldiTests.cxx)
 TARGET_LINK_LIBRARIES(ArnoldiTests SplashRuntime OpenCL)
+
+ADD_EXECUTABLE(DBTests DBTests.cxx)
+TARGET_LINK_LIBRARIES(DBTests SplashRuntime OpenCL)

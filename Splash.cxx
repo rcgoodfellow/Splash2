@@ -173,7 +173,7 @@ dsubvec & dsubvec::operator = (const dscalar &x) {
 }
 
 double*
-dvec::readback() {
+dvec::readback() const {
  
   size_t sz = fmax(N, NA);
   double *r = (double*)malloc(sizeof(double)*sz);
@@ -202,18 +202,21 @@ dsubvec::readback() {
   
 }
 
-string splash::show_vec(double *v, size_t N) {
+//string splash::show_vec(double *v, size_t N) {
+string splash::show_vec(const dvec &v) {
+
+  double *d = v.readback();
 
   stringstream ss;
   ss << "[";
-  if(N == 0) {
+  if(v.N == 0) {
     ss << "]";
     return ss.str();
   }
-  for(size_t i=0; i<N-1; ++i) {
-    ss << v[i] << ","; 
+  for(size_t i=0; i<v.N-1; ++i) {
+    ss << d[i] << ","; 
   }
-  ss << v[N-1] << "]";
+  ss << d[v.N-1] << "]";
   return ss.str();
 
 }
@@ -233,13 +236,15 @@ string splash::show_matrix(double *A, size_t N, size_t M) {
 
 }
 
-string splash::show_subspace(double *S, size_t N, size_t NA, size_t M) {
 
+string splash::show_subspace(const dsubspace &S) {
+
+  double *d = S.readback();
   stringstream ss;
-  ss << std::setprecision(3) << std::fixed;
-  for(size_t i=0; i<N; ++i) {
-    for(size_t j=0; j<M; ++j) {
-      ss << S[NA*j+i] << "\t";
+  ss << std::setprecision(6) << std::fixed;
+  for(size_t i=0; i<S.N; ++i) {
+    for(size_t j=0; j<S.M; ++j) {
+      ss << d[S.NA*j+i] << "\t";
     }
     ss << std::endl;
   }
@@ -266,6 +271,8 @@ splash::new_dsmatrix(vector<sm_row> elems)
   dsmatrix m{};
   m.N = N;
   m.n = n;
+  m.M = sM;
+  m.elems = elems;
 
   m.ri = cl::Buffer(ocl::get().ctx,
       CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
@@ -428,7 +435,73 @@ dvec dsubspace::operator () (size_t idx) {
 
 }
 
-double* dsubspace::readback() {
+dsubspace dsubspace::identity(size_t N, size_t M) {
+
+  dsubspace S{N, M};
+  
+  S.zero();
+
+  cl::Kernel ksx_ident{ocl::get().libsplash, "sx_ident"};
+
+  ksx_ident.setArg(0, S.v);
+  ksx_ident.setArg(1, S.N);
+  ksx_ident.setArg(2, S.NA);
+  ksx_ident.setArg(3, S.M);
+  ksx_ident.setArg(4, ocl::get().ipt);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      ksx_ident,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(S.M)},
+      cl::NDRange{ocl::lsize()});
+
+  return S;
+
+}
+
+#include <iostream>
+
+bool dsubspace::operator == (const dsubspace &S) {
+
+  if(N != S.N || M != S.M || NA != S.NA) { 
+    std::cout << "size rejection" << std::endl;
+    return false; 
+  }
+
+  cl::Kernel ksx_eq{ocl::get().libsplash, "sx_eq"};
+
+  unsigned long diff_h = 0;
+  cl::Buffer diff{ocl::get().ctx,
+    CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR,
+    sizeof(unsigned long),
+    &diff_h};
+
+  ksx_eq.setArg(0, v);
+  ksx_eq.setArg(1, S.v);
+  ksx_eq.setArg(2, S.NA*S.M);
+  ksx_eq.setArg(3, ocl::get().ipt);
+  ksx_eq.setArg(4, 1e-6);
+  ksx_eq.setArg(5, diff);
+
+  ocl::get().q.enqueueNDRangeKernel(
+      ksx_eq,
+      cl::NullRange,
+      cl::NDRange{ocl::gsize(S.NA*S.M)},
+      cl::NDRange{ocl::lsize()});
+
+  ocl::get().q.enqueueReadBuffer(
+      diff,
+      CL_TRUE,
+      0,
+      sizeof(unsigned long),
+      &diff_h);
+
+  std::cout << "diffcount=" << diff_h << std::endl;
+  return diff_h == 0L;
+
+}
+
+double* dsubspace::readback() const {
 
   double *d = (double*)malloc(sizeof(double)*NA*M);
   ocl::get().q.enqueueReadBuffer(
@@ -507,13 +580,15 @@ LibSplash::readSource() {
   mvmul_st = read_file(splashdir + "/kernels/MatrixVectorMul.cl");
   mxops_st = read_file(splashdir + "/kernels/MatrixOps.cl");
   vecops_st = read_file(splashdir + "/kernels/VectorOps.cl");
+  sspaceops_st = read_file(splashdir + "/kernels/SubspaceOps.cl");
 
   src = {
     make_pair(redux_st.c_str(), redux_st.length()),
     make_pair(elemental_st.c_str(), elemental_st.length()),
     make_pair(mvmul_st.c_str(), mvmul_st.length()),
     make_pair(mxops_st.c_str(), mxops_st.length()),
-    make_pair(vecops_st.c_str(), vecops_st.length())
+    make_pair(vecops_st.c_str(), vecops_st.length()),
+    make_pair(sspaceops_st.c_str(), sspaceops_st.length())
   };
 
 }
@@ -772,7 +847,7 @@ dscalar splash::ksqrt(const dscalar &s) {
   return sqs;
 }
 
-dscalar splash::knorm(const dvec &v) {
+dscalar splash::norm(const dvec &v) {
 
   dvec sqv{};
   sqv.v = cl::Buffer(ocl::get().ctx,

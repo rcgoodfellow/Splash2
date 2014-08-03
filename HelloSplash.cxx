@@ -15,7 +15,7 @@ int main() {
  
   //read the result of the dot product from the GPU back to the host
   double q0q1_h = q0q1.readback();
-  std::cout << "Dot Product Result: " << q0q1_h << std::endl;
+  cout << "Dot Product Result: " << q0q1_h << endl;
 
   //Create a sparse matrix
   dsmatrix A =  new_dsmatrix({
@@ -28,32 +28,26 @@ int main() {
 
   //perform matrix vector multiplication on the GPU
   dvec Aq0 = A * q0;
-  double *Aq0_h = Aq0.readback();
-  std::cout << "Aq0 : " << show_vec(Aq0_h, Aq0.N) << std::endl;
+  cout << "Aq0 : " << show_vec(Aq0) << endl;
 
   //normalize a vector on the GPU
-  dscalar nq0 = knorm(q0);
-  std::cout << "norm(q0) : " << nq0.readback() << std::endl;
+  dscalar nq0 = norm(q0);
+  cout << "norm(q0) : " << nq0.readback() << endl;
 
   dvec nzq0 = q0 / nq0;
-  double *nzq0_h = nzq0.readback();
-  std::cout << "nzq0 : " << show_vec(nzq0_h, nzq0.N) << std::endl;
+  cout << "nzq0 : " << show_vec(nzq0) << endl;
 
-  q1 = q1 / knorm(q1);
-  double *q1_h = q1.readback();
-  std::cout << "q1 : " << show_vec(q1_h, q1.N) << std::endl;
+  q1 = q1 / norm(q1);
+  cout << "q1 : " << show_vec(q1) << endl;
 
   dvec q2 = A * q1;
-  double *q2_h = q2.readback();
-  std::cout << "q2 : " << show_vec(q2_h, q2.N) << std::endl;
+  cout << "q2 : " << show_vec(q2) << endl;
 
   dvec q12 = q1 + q2;
-  double *q12_h = q12.readback();
-  std::cout << "q12 : " << show_vec(q12_h, q12.N) << std::endl;
+  cout << "q12 : " << show_vec(q12) << endl;
   
   dvec q21 = q2 - q1;
-  double *q21_h = q21.readback();
-  std::cout << "q21 : " << show_vec(q21_h, q21.N) << std::endl;
+  cout << "q21 : " << show_vec(q21) << endl;
 
   return EXIT_SUCCESS;
 }

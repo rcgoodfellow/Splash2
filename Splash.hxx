@@ -31,7 +31,8 @@ struct LibSplash {
               elemental_st,
               mvmul_st,
               mxops_st,
-              vecops_st;
+              vecops_st,
+              sspaceops_st;
 
   LibSplash(std::string splashdir);
 
@@ -91,6 +92,35 @@ class ocl {
     void operator=(const ocl &) = delete;
 };
 
+/*= DeviceElement *===========================================================*
+ *
+ * A DeviceElement is the base class for all mathematical objects that are
+ * used in splash. Conceptually this class is really just a pointer to device
+ * memory with a bit of extra data.
+ *
+ * This class is necessary over the basic OpenCL facilities to allow for finer
+ * granularity objects than are allowed by the OpenCL runtime.
+ */
+struct DeviceElement {
+
+  size_t size, offset;
+  cl::Buffer memory;
+
+  /* Creates a DeviceElement of +size @size, +offset 0 and allocates the 
+   * required +memory
+   */
+  DeviceElement(size_t size);
+
+  /* Creates a DeviceElement of +size @size, +offset @offset using @memory
+   */
+  DeviceElement(size_t size, size_t offset, cl::Buffer memory);
+
+};
+
+struct Vector {
+
+};
+
 struct dvec;
 
 struct dscalar {
@@ -132,18 +162,18 @@ struct dvec {
   dsubvec operator() (size_t idx);
   dsubvec operator() (size_t begin, size_t end);
 
-  double* readback();
+  double* readback() const;
 
 };
 
-std::string show_vec(double *v, size_t N);
-std::string show_matrix(double *A, size_t N, size_t M);
-std::string show_subspace(double *A, size_t N, size_t NA, size_t M);
 
+using sm_row = std::vector<sm_sub_element>;
 
 struct dsmatrix {
   size_t N, n;
   cl::Buffer ri, ci, v;
+  SparseMatrix *M;
+  std::vector<sm_row> elems;
 };
 
 struct dmatrix {
@@ -173,14 +203,29 @@ struct dsubspace {
          M;   //size of the subspace
   cl::Buffer v;
   _cl_buffer_region *br{nullptr};
+  double *_data{nullptr};
 
-  dsubspace(size_t N, size_t M, bool alloc = true);
+  explicit dsubspace(size_t N, size_t M, bool alloc = true);
+  dsubspace() = default;
+  dsubspace(const dsubspace &) = default;
+  dsubspace & operator = (const dsubspace&) = default;
+
   dvec operator () (size_t idx);
   dsubspace operator () (size_t si, size_t fi);
   void zero();
-  double* readback();
+  double* readback() const;
+
+  static dsubspace identity(size_t N, size_t M);
+
+  bool operator == (const dsubspace &);
 
 };
+
+//std::string show_vec(double *v, size_t N);
+std::string show_vec(const dvec &);
+std::string show_matrix(double *A, size_t N, size_t M);
+//std::string show_subspace(double *A, size_t N, size_t NA, size_t M);
+std::string show_subspace(const dsubspace &);
 
 dvec transmult(const dsubspace &, const dvec &);
 
@@ -190,7 +235,7 @@ dscalar redux_add(const dvec&);
 
 //operators ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //vector ......................................................................
-dscalar knorm(const dvec&);
+dscalar norm(const dvec&);
 
 //scalar ......................................................................
 dscalar ksqrt(const dscalar&);
@@ -219,7 +264,6 @@ dvec operator * (const dsubspace&, const dvec&);
 
 dvec new_dvec(std::vector<double> values);
 
-using sm_row = std::vector<sm_sub_element>;
 
 dsmatrix new_dsmatrix(std::vector<sm_row>);
 
