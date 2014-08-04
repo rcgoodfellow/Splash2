@@ -122,20 +122,27 @@ class DeviceElement {
 
     //Copies this element and returns the copy
     Derived operator ! () const {
+      
+      size_t sz{0};
+      if(_buffer_region.size != 0) { sz = _buffer_region.size - _offset*sizeof(T); }
+      else { sz = logicalSize()*sizeof(T); }
 
       Derived copy{*static_cast<const Derived*>(this)};
       copy._memory = cl::Buffer{ocl::get().ctx,
         CL_MEM_READ_WRITE,
-        logicalSize()*sizeof(T)};
+        sz};
 
       copy._offset = 0;
+      copy._stride = _stride;
+      copy._buffer_region = {0,sz};
+      copy._data = (T*)malloc(sz);
 
       ocl::get().q.enqueueCopyBuffer(
           _memory,
           copy._memory,
           offset()*sizeof(T),
           0L,
-          logicalSize()*sizeof(T));
+          sz);
 
       return copy;
     }
