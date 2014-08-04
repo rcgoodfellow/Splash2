@@ -89,8 +89,6 @@ class Vector : public DeviceElement<Vector, double> {
       }
       else {
 
-        std::cout << "bongo drums" << std::endl;
-
         cl::Kernel k{ocl::get().libsplash, "vx_strset"};
         k.setArg(0, _memory);
         k.setArg(1, other._memory);

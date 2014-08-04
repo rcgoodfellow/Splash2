@@ -79,18 +79,18 @@ class DeviceElement {
           CL_BUFFER_CREATE_TYPE_REGION,
           &_buffer_region);
 
-      
-      size_t sz{0};
-      if(_buffer_region.size != 0) { sz = _buffer_region.size - _offset*sizeof(T); }
-      else { sz = logicalSize()*sizeof(T); }
-      
-      _data = (T*)malloc(sz);
+     
+      _data = (T*)malloc(dataSize()*sizeof(T));
       
     }
 
     //returns the size in elements of the memory region allocated for this object
     size_t allocationSize() const { 
       return _memory.getInfo<CL_MEM_SIZE>()/sizeof(T); 
+    }
+
+    size_t dataSize() const {
+      return allocationSize() - _offset;
     }
 
     /* returns the size in elements of this object within the allocated memory 
@@ -106,15 +106,11 @@ class DeviceElement {
 
     const double* data() const { 
 
-      size_t sz{0};
-      if(_buffer_region.size != 0) { sz = _buffer_region.size - _offset*sizeof(T); }
-      else { sz = logicalSize()*sizeof(T); }
-
       ocl::get().q.enqueueReadBuffer(
           _memory,
           CL_TRUE,
           offset()*sizeof(T),
-          sz,
+          dataSize()*sizeof(T), //sz,
           _data);
 
       return _data; 
@@ -122,27 +118,23 @@ class DeviceElement {
 
     //Copies this element and returns the copy
     Derived operator ! () const {
-      
-      size_t sz{0};
-      if(_buffer_region.size != 0) { sz = _buffer_region.size - _offset*sizeof(T); }
-      else { sz = logicalSize()*sizeof(T); }
 
       Derived copy{*static_cast<const Derived*>(this)};
       copy._memory = cl::Buffer{ocl::get().ctx,
         CL_MEM_READ_WRITE,
-        sz};
+        dataSize()*sizeof(T)};
 
       copy._offset = 0;
       copy._stride = _stride;
-      copy._buffer_region = {0,sz};
-      copy._data = (T*)malloc(sz);
+      copy._buffer_region = {0,0}; //{0,sz};
+      copy._data = (T*)malloc(dataSize()*sizeof(T));
 
       ocl::get().q.enqueueCopyBuffer(
           _memory,
           copy._memory,
           offset()*sizeof(T),
           0L,
-          sz);
+          dataSize()*sizeof(T));
 
       return copy;
     }
