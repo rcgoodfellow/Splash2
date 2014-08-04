@@ -26,3 +26,9 @@ TARGET_LINK_LIBRARIES(ArnoldiTests SplashRuntime OpenCL)
 
 ADD_EXECUTABLE(DBTests DBTests.cxx)
 TARGET_LINK_LIBRARIES(DBTests SplashRuntime OpenCL)
+
+ADD_EXECUTABLE(VectorTests VectorTests.cxx)
+TARGET_LINK_LIBRARIES(VectorTests SplashRuntime OpenCL)
+
+ADD_EXECUTABLE(MatrixTests MatrixTests.cxx)
+TARGET_LINK_LIBRARIES(MatrixTests SplashRuntime OpenCL)

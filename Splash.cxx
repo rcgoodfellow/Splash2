@@ -10,6 +10,13 @@ using std::to_string;
 using std::vector;
 using std::stringstream;
 
+//= DeviceElement =============================================================
+
+
+//= Vector ====================================================================
+
+
+
 //dvec ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 dvec
 splash::new_dvec(std::vector<double> values)

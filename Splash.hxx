@@ -92,35 +92,6 @@ class ocl {
     void operator=(const ocl &) = delete;
 };
 
-/*= DeviceElement *===========================================================*
- *
- * A DeviceElement is the base class for all mathematical objects that are
- * used in splash. Conceptually this class is really just a pointer to device
- * memory with a bit of extra data.
- *
- * This class is necessary over the basic OpenCL facilities to allow for finer
- * granularity objects than are allowed by the OpenCL runtime.
- */
-struct DeviceElement {
-
-  size_t size, offset;
-  cl::Buffer memory;
-
-  /* Creates a DeviceElement of +size @size, +offset 0 and allocates the 
-   * required +memory
-   */
-  DeviceElement(size_t size);
-
-  /* Creates a DeviceElement of +size @size, +offset @offset using @memory
-   */
-  DeviceElement(size_t size, size_t offset, cl::Buffer memory);
-
-};
-
-struct Vector {
-
-};
-
 struct dvec;
 
 struct dscalar {
