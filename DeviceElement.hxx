@@ -89,9 +89,7 @@ class DeviceElement {
       return _memory.getInfo<CL_MEM_SIZE>()/sizeof(T); 
     }
 
-    size_t dataSize() const {
-      return allocationSize() - _offset;
-    }
+    size_t dataSize() const { return allocationSize() - _offset; }
 
     /* returns the size in elements of this object within the allocated memory 
      * region */

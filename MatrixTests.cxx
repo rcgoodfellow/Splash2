@@ -32,11 +32,11 @@ int main() {
   r2 = {{2,2,2,2,2,2,2,2}};
   cout << M.show() << endl;
 
-  Vector c7 = M.C(2);
-  cout << "c7: " << c7.show() << endl;
+  Vector c2 = M.C(2);
+  cout << "c2: " << c2.show() << endl;
 
-  Vector c724 = !c7(2,4);
-  cout << "c724: " << c724.show() << endl;
-  c724 = {{3,3,3}};
+  Vector c224 = !c2(2,4);
+  cout << "c224: " << c224.show() << endl;
+  c224 = {{3,3,3}};
   cout << M.show() << endl;
 }
