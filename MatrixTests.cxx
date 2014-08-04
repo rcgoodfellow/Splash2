@@ -32,6 +32,9 @@ int main() {
   r2 = {{2,2,2,2,2,2,2,2}};
   cout << M.show() << endl;
 
-  Vector c7 = M.C(2);
+  Vector c7 = M.C(5);
   cout << "c7: " << c7.show() << endl;
+
+  Vector c724 = c7(2,5);
+  cout << "c724: " << c724.show() << endl;
 }

@@ -37,7 +37,16 @@ class Vector : public DeviceElement<Vector, double> {
     }
 
     Vector operator()(size_t begin, size_t end) { 
-      return Vector( end - begin + 1L, begin, 1L, _memory); 
+      if(type == Type::Row) {
+        return Vector( end - begin + 1L, begin, 1L, _memory); 
+      }
+      else {
+        return Vector(
+            _stride*end - _stride*begin + _stride,
+            _stride*begin + _offset, 
+            _stride, 
+            _memory);
+      }
     }
 
     size_t N() const { return logicalSize(); }
