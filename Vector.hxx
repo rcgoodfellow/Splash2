@@ -7,12 +7,13 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include "KRedux.hxx"
 
 namespace splash {
 
 class Vector : public DeviceElement<Vector, double> {
 
-  enum class Type {Row, Column};
+  enum class Type {Row, Column, SparseColumn};
   Type type{Type::Row};
 
   public:
@@ -40,12 +41,16 @@ class Vector : public DeviceElement<Vector, double> {
       if(type == Type::Row) {
         return Vector( end - begin + 1L, begin, 1L, _memory); 
       }
-      else {
+      else if(type == Type::Column) {
         return Vector(
             _stride*end - _stride*begin + _stride,
             _stride*begin + _offset, 
             _stride, 
             _memory);
+      }
+      else /*Type::SparseColumn*/ {
+
+        throw std::runtime_error{"Not Implemented"};
       }
     }
 
@@ -56,6 +61,7 @@ class Vector : public DeviceElement<Vector, double> {
       const double *d = data();
 
       std::stringstream ss;
+      ss << std::setprecision(3) << std::fixed;
       ss << "[";
       if(N() == 0) {
         ss << "]";
@@ -87,7 +93,7 @@ class Vector : public DeviceElement<Vector, double> {
             _offset*sizeof(double),
             other.logicalSize()*sizeof(double));
       }
-      else {
+      else if(type == Type::Column) {
 
         cl::Kernel k{ocl::get().libsplash, "vx_strset"};
         k.setArg(0, _memory);
@@ -141,6 +147,104 @@ class Vector : public DeviceElement<Vector, double> {
           &diff_h);
 
       return diff_h == 0L;
+
+    }
+
+    Vector redux_add() {
+
+      Vector r{1};
+
+      cl::Kernel k{ocl::get().libsplash, "redux_add"};
+      Shape shp0 = KRedux::shape(N());
+      size_t lsz0 = sizeof(double) * KRedux::lmemSize(shp0);
+      size_t rsz0 = sizeof(double) * shp0.wgCount();
+
+      cl::Buffer r0{ocl::get().ctx, CL_MEM_READ_WRITE, rsz0};
+
+      k.setArg(0, _memory);
+      k.setArg(1, N());
+      k.setArg(2, ocl::get().ipt);
+      k.setArg(3, cl::Local(lsz0));
+      k.setArg(4, r0);
+      ocl::get().q.enqueueNDRangeKernel(k, cl::NullRange, shp0.G, shp0.L);
+
+      if(shp0.wgCount() > 1) {
+
+        Shape shp1 = KRedux::shape(shp0.wgCount());
+        size_t lsz1 = sizeof(double) * KRedux::lmemSize(shp1);
+
+        k.setArg(0, r0);
+        k.setArg(1, rsz0);
+        k.setArg(2, ocl::get().ipt);
+        k.setArg(3, cl::Local(lsz1));
+        k.setArg(4, r._memory);
+
+        ocl::get().q.enqueueNDRangeKernel(k, cl::NullRange, shp1.G, shp1.L);
+      }
+      else { r._memory = r0; }
+
+      return r;
+
+    }
+
+    Vector sqrt() {
+
+      Vector s{N()};
+      
+      cl::Kernel k{ocl::get().libsplash, "ksqrt"};
+
+      k.setArg(0, _memory);
+      k.setArg(1, N());
+      k.setArg(2, ocl::get().ipt);
+      k.setArg(3, s._memory);
+      ocl::get().q.enqueueNDRangeKernel(k,
+          cl::NullRange,
+          cl::NDRange{ocl::gsize(N())},
+          cl::NDRange{ocl::lsize()});
+
+      return s;
+
+    }
+
+    Vector norm() {
+
+      Vector sq{N()};
+
+      cl::Kernel k{ocl::get().libsplash, "ksq"};
+      k.setArg(0, _memory);
+      k.setArg(1, N());
+      k.setArg(2, ocl::get().ipt);
+      k.setArg(3, sq._memory);
+      ocl::get().q.enqueueNDRangeKernel(k,
+          cl::NullRange,
+          cl::NDRange{ocl::gsize(N())},
+          cl::NDRange{ocl::lsize()});
+
+      Vector sq_sum = sq.redux_add();
+      return sq_sum.sqrt();
+
+    }
+
+    Vector operator/ (const Vector &x) {
+      
+      if(x.N() != 1){ throw std::runtime_error("nonconformal division"); }
+
+      Vector q{N()};
+
+      cl::Kernel k{ocl::get().libsplash, "kdiv_vs"};
+      k.setArg(0, _memory);
+      k.setArg(1, x._memory);
+      k.setArg(2, N());
+      k.setArg(3, ocl::get().ipt);
+      k.setArg(4, 0L);
+      k.setArg(5, 0L);
+      k.setArg(6, q._memory);
+      ocl::get().q.enqueueNDRangeKernel(k,
+          cl::NullRange,
+          cl::NDRange{ocl::gsize(N())},
+          cl::NDRange{ocl::lsize()});
+
+      return q;
 
     }
 

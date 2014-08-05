@@ -32,3 +32,9 @@ TARGET_LINK_LIBRARIES(VectorTests SplashRuntime OpenCL)
 
 ADD_EXECUTABLE(MatrixTests MatrixTests.cxx)
 TARGET_LINK_LIBRARIES(MatrixTests SplashRuntime OpenCL)
+
+ADD_EXECUTABLE(SparseMatrixTests SparseMatrixTests.cxx)
+TARGET_LINK_LIBRARIES(SparseMatrixTests SplashRuntime OpenCL)
+
+ADD_EXECUTABLE(Arnoldi2 Arnoldi2.cxx)
+TARGET_LINK_LIBRARIES(Arnoldi2 SplashRuntime OpenCL)

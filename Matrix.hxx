@@ -59,14 +59,29 @@ class Matrix : public DeviceElement<Matrix, double> {
 
       std::stringstream ss;
       ss << std::setprecision(3) << std::fixed;
-      for(size_t i=0; i<_N; ++i) { 
-        for(size_t j=0; j<_M; ++j) {
-          ss << A[_M*i+j] << "\t";
+      for(size_t i=0; i<_M; ++i) { 
+        for(size_t j=0; j<_N; ++j) {
+          ss << A[_N*i+j] << "\t";
         }
         ss << std::endl;
       }
 
       return ss.str();
+
+    }
+
+    void zero() {
+
+      cl::Kernel k{ocl::get().libsplash, "mx_zero"};
+      k.setArg(0, _memory);
+      k.setArg(1, _N);
+      k.setArg(2, _M);
+      k.setArg(3, ocl::get().ipt);
+
+      ocl::get().q.enqueueNDRangeKernel(k,
+          cl::NullRange,
+          cl::NDRange{ocl::gsize(_N*_M)},
+          cl::NDRange{ocl::lsize()});
 
     }
 

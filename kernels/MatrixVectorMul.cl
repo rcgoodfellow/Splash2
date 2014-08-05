@@ -21,6 +21,35 @@ smvx_mul(
   }
 }
 
+kernel
+void
+smv_mul(
+    unsigned int M,
+    unsigned int N,
+    unsigned short n,
+    global double *A,
+    global unsigned int *C,
+    global unsigned short *R,
+    global double *x,
+    global double *Ax) {
+
+  size_t tid = get_global_id(0);
+  if(tid > M){ return; }
+
+  size_t ri = tid*n,
+         rs = R[tid];
+  
+  Ax[tid] = 0;
+  for(size_t i=0; i<rs; ++i) {
+
+    Ax[tid] += A[ri + i] * x[C[ri+i]]; //fused multiply add candidate?
+
+  }
+
+
+}
+
+
 __kernel
 void
 mxvx_mul(

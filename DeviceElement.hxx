@@ -78,7 +78,6 @@ class DeviceElement {
           CL_MEM_READ_WRITE, 
           CL_BUFFER_CREATE_TYPE_REGION,
           &_buffer_region);
-
      
       _data = (T*)malloc(dataSize()*sizeof(T));
       
@@ -108,7 +107,7 @@ class DeviceElement {
           _memory,
           CL_TRUE,
           offset()*sizeof(T),
-          dataSize()*sizeof(T), //sz,
+          dataSize()*sizeof(T),
           _data);
 
       return _data; 
