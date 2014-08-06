@@ -32,7 +32,8 @@ struct LibSplash {
               mvmul_st,
               mxops_st,
               vecops_st,
-              sspaceops_st;
+              sspaceops_st,
+              mvm_st;
 
   LibSplash(std::string splashdir);
 

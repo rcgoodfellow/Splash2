@@ -2,8 +2,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8.9)
 
 SET(CMAKE_CXX_COMPILER clang++)
 SET(CMAKE_C_COMPILER clang)
-SET(CMAKE_CXX_FLAGS "-std=c++11 -Wall -Wextra -fcolor-diagnostics -fpic -O0 -g")
-SET(CMAKE_C_FLAGS "-std=c11 -Wall -Wextra -fcolor-diagnostics -O0 -g")
+SET(CMAKE_CXX_FLAGS "-DMKL_ILP64 -m64 -std=c++11 -Wall -Wextra -fcolor-diagnostics -fpic -O3 -g")
+SET(CMAKE_C_FLAGS "-DMKL_ILP64 -m64 -std=c11 -Wall -Wextra -fcolor-diagnostics -O3 -g")
 
 SET(CMAKE_EXE_LINKER_FLAGS "-std=c++11")
 SET(CMAKE_MODULE_LINKER_FLAGS "-std=c++11")
@@ -15,6 +15,7 @@ ADD_LIBRARY(SplashRuntime SHARED
   SparseMatrix.c SparseMatrix.h
   SparseMatrix.cxx SparseMatrix.hxx
   Arnoldi.cxx Arnoldi.hxx
+  VecOps.cxx VecOps.hxx
   DB.cxx DB.hxx
   )
 
@@ -38,3 +39,11 @@ TARGET_LINK_LIBRARIES(SparseMatrixTests SplashRuntime OpenCL)
 
 ADD_EXECUTABLE(Arnoldi2 Arnoldi2.cxx)
 TARGET_LINK_LIBRARIES(Arnoldi2 SplashRuntime OpenCL)
+
+LINK_DIRECTORIES(/opt/intel/mkl/lib/intel64)
+
+ADD_EXECUTABLE(MVDotTest MVDotTest.cxx)
+TARGET_LINK_LIBRARIES(MVDotTest SplashRuntime 
+  OpenCL 
+  mkl_intel_ilp64 mkl_core mkl_intel_thread iomp5 dl pthread m
+  )

@@ -37,6 +37,17 @@ class Vector : public DeviceElement<Vector, double> {
           x.data());
     }
 
+    Vector(size_t size, double *x)
+      : DeviceElement<Vector, double>{size}
+    {
+      ocl::get().q.enqueueWriteBuffer(
+          _memory,
+          CL_TRUE,
+          0L,
+          allocationSize()*sizeof(double),
+          x);
+    }
+
     Vector operator()(size_t begin, size_t end) { 
       if(type == Type::Row) {
         return Vector( end - begin + 1L, begin, 1L, _memory); 

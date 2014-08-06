@@ -588,6 +588,7 @@ LibSplash::readSource() {
   mxops_st = read_file(splashdir + "/kernels/MatrixOps.cl");
   vecops_st = read_file(splashdir + "/kernels/VectorOps.cl");
   sspaceops_st = read_file(splashdir + "/kernels/SubspaceOps.cl");
+  mvm_st = read_file(splashdir + "/kernels/MVMul.cl");
 
   src = {
     make_pair(redux_st.c_str(), redux_st.length()),
@@ -595,7 +596,8 @@ LibSplash::readSource() {
     make_pair(mvmul_st.c_str(), mvmul_st.length()),
     make_pair(mxops_st.c_str(), mxops_st.length()),
     make_pair(vecops_st.c_str(), vecops_st.length()),
-    make_pair(sspaceops_st.c_str(), sspaceops_st.length())
+    make_pair(sspaceops_st.c_str(), sspaceops_st.length()),
+    make_pair(mvm_st.c_str(), mvm_st.length())
   };
 
 }

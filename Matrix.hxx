@@ -42,6 +42,18 @@ class Matrix : public DeviceElement<Matrix, double> {
         x.data());
     }
 
+    Matrix(size_t rows, size_t cols, double *x)
+      : DeviceElement<Matrix, double>(rows*cols),
+        _M{rows}, _N{cols}
+    {
+      ocl::get().q.enqueueWriteBuffer(
+          _memory,
+          CL_TRUE,
+          0,
+          allocationSize()*sizeof(double),
+          x);
+    }
+
     Vector R(size_t idx) {
       return Vector(_N, _N*idx, 1L, _memory);
     }
